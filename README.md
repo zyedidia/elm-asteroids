@@ -2,4 +2,4 @@
 
 This is a simple clone of the famous [Asteroids] (http://en.wikipedia.org/wiki/Asteroids_%28video_game%29) game written in elm.
 
-[Demo here] (www.zyedidia.github.io/asteroids/asteroids.html)
+[Demo here] (http://zyedidia.github.io/asteroids/asteroids.html)
