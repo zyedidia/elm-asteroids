@@ -28,8 +28,10 @@ type alias Sprite =
     , isAsteroid : Bool
     }
 
+type Win = Win | Lose | None
+
 type alias State =
-    { sprites : List Sprite , winText : Element, cooldown : Int }
+    { sprites : List Sprite, winner : Win, winText : Element, cooldown : Int }
 
 startingSprites : List Sprite
 startingSprites =
@@ -63,6 +65,7 @@ randArray = Array.fromList randList
 cooldown : number
 cooldown = 50
 
+get : number -> Array.Array a -> a
 get index array = case (Array.get index array) of
     Just val -> val
 
@@ -111,12 +114,21 @@ update : Input -> State -> State
 update input state =
     let spritesArray = Array.fromList state.sprites
         player = get 0 spritesArray
-        sprites' = List.map (\x -> updateSprite input x state) state.sprites ++ (if input.space && (state.cooldown <= 0) && (fst player.box.size) > 0 then [addBullet player] else List.foldr (++) [] (List.map (\x -> if collide state.sprites x && (fst x.box.size) > 15 then [addAsteroid (fst x.box.size / 1.5, snd x.box.size / 1.5) x.box.position (clamp (round (fst x.box.position)) 10 90)] else []) state.sprites))
+        sprites' = List.map (\x -> updateSprite input x state) state.sprites ++ 
+          (if input.space && (state.cooldown <= 0) && (fst player.box.size) > 0 then 
+            [addBullet player] 
+          else List.foldr (++) [] (List.map (\x -> if collide state.sprites x && (fst x.box.size) > 20 then 
+            [addAsteroid (fst x.box.size / 1.5, snd x.box.size / 1.5) x.box.position (clamp (round (fst x.box.position)) 10 90)] else []) state.sprites))
+        winner' = if (fst player.box.size) == 0 then Lose else if not (contains sprites' (\x -> x.isAsteroid && not ((fst x.box.size) == 0))) then Win else None
     in
     { state |
         sprites <- sprites'
         , cooldown <- if input.space && state.cooldown <= 0 then cooldown else state.cooldown - 1
-        , winText <- if (fst player.box.size) == 0 then whiteText "You lose" else if not (contains sprites' (\x -> x.isAsteroid && not ((fst x.box.size) == 0))) then whiteText "You win" else whiteText ""
+        , winner <- winner'
+        , winText <- case winner' of
+            Win -> whiteText "You win!"
+            Lose -> whiteText "You lose!"
+            None -> whiteText ""
     }
 
 updateSprite : Input -> Sprite -> State -> Sprite
@@ -131,7 +143,7 @@ updateSprite input sprite state =
             { sprite
             | box <- {
                 position = (AABB.translate (dt *> (sprite.velocity)) translateBox).position
-                , size = if collide state.sprites sprite then if sprite.isAsteroid && (fst sprite.box.size) > 15 then (fst sprite.box.size / 1.5, snd sprite.box.size / 1.5) else (0, 0) else sprite.box.size
+                , size = if collide state.sprites sprite then if sprite.isAsteroid && (fst sprite.box.size) > 20 then (fst sprite.box.size / 1.5, snd sprite.box.size / 1.5) else (0, 0) else sprite.box.size
                 }
             , velocity <- sprite.velocity <+> velocity
             , angle <- sprite.angle - (fst arrows * sprite.rotateSpeed)
@@ -153,6 +165,7 @@ collide sprites sprite =
 contains : List a -> (a -> Bool) -> Bool
 contains list f = List.length (fst (List.partition (f) list)) > 0
 
+view : (Int, Int) -> State -> Element 
 view (w, h) state =
     let sprites = state.sprites
     in
@@ -161,6 +174,7 @@ view (w, h) state =
 
 type alias Input = { dt : Time.Time, arrows : { x : Int, y : Int }, space : Bool, dimensions : (Int, Int)}
 
+framerate : Signal Float
 framerate = Time.fps 60
 
 space : Signal Bool
@@ -170,7 +184,7 @@ input : Signal Input
 input = Input <~ framerate ~ Keyboard.arrows ~ space ~ Window.dimensions
 
 state : State
-state = State startingSprites (whiteText "") 0
+state = State startingSprites None (whiteText "") 0
 
 whiteText : String -> Element
 whiteText text = Text.leftAligned <| Text.color white <| Text.fromString text
